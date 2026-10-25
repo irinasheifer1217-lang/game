@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тропинка зоолога — образовательный платформер</title>
+<style>
+:root{--green:#236b46;--mint:#e5f4e7;--ink:#193c30;--gold:#ffcf58;--paper:#fffef7}
+*{box-sizing:border-box}
+body{margin:0;background:#edf6ed;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+button:focus-visible{outline:4px solid #e5a51b;outline-offset:3px}
+button:disabled{cursor:default;opacity:.55}
+header{max-width:1100px;margin:auto;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font-size:clamp(21px,4vw,30px);margin:0}
+.subtitle{font-size:13px;margin:4px 0 0}
+main{max-width:1100px;margin:auto;padding:0 12px 20px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.stat{background:white;border:1px solid #c9dfcc;border-radius:16px;padding:10px 15px;font-weight:750}
+.progress{flex:1;min-width:140px;height:15px;background:#d4e5d4;border-radius:20px;overflow:hidden}
+.progress span{display:block;height:100%;width:0;background:var(--green);transition:width .4s}
+.small{border:1px solid #bbd4bf;border-radius:12px;background:white;color:var(--ink);padding:10px 14px;font-weight:650}
+.stage{position:relative;border-radius:24px;overflow:hidden;border:2px solid #bdd6be;box-shadow:0 14px 35px #234c3015;background:#ccebd9}
+canvas{display:block;width:100%;height:clamp(280px,49vw,470px)}
+.hint{text-align:center;margin:10px 0;font-size:14px}
+.controls{display:flex;justify-content:space-between;gap:16px;margin-top:12px}
+.controls div{display:flex;gap:12px}
+.move{width:76px;height:64px;border:0;border-radius:18px;background:white;color:var(--green);font-size:28px;font-weight:800;box-shadow:0 4px 0 #bdd3be;touch-action:none;user-select:none;-webkit-user-select:none}
+.jump{width:auto;padding:0 24px;background:var(--green);color:white;font-size:19px}
+.overlay{position:fixed;inset:0;z-index:10;background:#102a20a8;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(5px)}
+.overlay[hidden]{display:none}
+.card{width:min(680px,100%);max-height:92dvh;overflow:auto;background:var(--paper);border-radius:25px;padding:clamp(20px,4vw,32px);box-shadow:0 25px 90px #0004}
+.card h2{margin:0 0 12px;font-size:clamp(23px,4vw,31px)}
+.card p{line-height:1.55}
+.badge{display:inline-block;background:#e2efda;border-radius:30px;padding:7px 13px;margin-bottom:15px;font-size:14px;font-weight:750}
+.primary{border:0;border-radius:15px;background:var(--green);color:white;padding:15px 22px;font-size:18px;font-weight:750;min-height:55px}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.animal{font-size:62px;margin:0 0 8px}
+.answers{display:grid;gap:10px;margin-top:20px}
+.answer{text-align:left;padding:15px 18px;border:2px solid #cfdeca;border-radius:15px;background:white;color:var(--ink);font-size:18px;min-height:58px}
+.answer:hover{border-color:var(--green);background:#f0f7ed}
+.answer.wrong{background:#fff0dc;border-color:#ddad67}
+.answer.correct{background:#dff2de;border-color:#428453}
+.feedback{min-height:30px;font-size:16px;line-height:1.5;margin-top:16px}
+.reference{display:grid;gap:10px}
+.reference article{background:#edf5e8;border-radius:14px;padding:12px 15px}
+.reference strong{display:block;margin-bottom:3px}
+.reference p{margin:0;font-size:15px}
+.note{font-size:14px;color:#526958}
+.result{font-size:52px;text-align:center}
+.warning{color:#a74224}
+footer{max-width:1000px;margin:5px auto;padding:0 20px 15px;text-align:center;font-size:12px;color:#59705f}
+@media(max-width:560px){header{align-items:flex-start}.stat{padding:9px 11px;font-size:14px}.small{font-size:13px}.move{width:65px}.jump{width:auto;padding:0 18px}.card{padding:22px}.answer{font-size:16px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>🌿 Тропинка зоолога</h1><p class="subtitle">Чем животные отличаются друг от друга · 2 класс</p></div>
+<button class="small" id="help">📖 Памятка</button>
+</header>
+<main>
+<div class="stats" aria-label="Показатели игры">
+<div class="stat" id="timer" role="timer">⏱ 15:00</div>
+<div class="stat" id="score">⭐ 0</div>
+<div class="stat" id="count">Задания: 0 / 10</div>
+<div class="progress" role="progressbar" aria-label="Пройдено заданий" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0"><span id="bar"></span></div>
+<button class="small" id="pause">⏸ Пауза</button>
+</div>
+<div class="stage">
+<canvas id="world" aria-label="Игровая тропинка с десятью станциями. Идите вправо и прыгайте на платформы."></canvas>
+</div>
+<p class="hint">Идите к светящейся станции. ← → или A / D — движение; пробел, ↑ или W — прыжок.</p>
+<div class="controls" aria-label="Сенсорное управление">
+<div>
+<button class="move" data-key="left" aria-label="Двигаться влево">◀</button>
+<button class="move" data-key="right" aria-label="Двигаться вправо">▶</button>
+</div>
+<button class="move jump" data-key="jump">Прыгнуть ↑</button>
+</div>
+</main>
+<footer>10 открытий о животных · 15 минут игрового времени · Ошибки помогают учиться: попытки не ограничены</footer>
+
+<div class="overlay" id="overlay">
+<section class="card" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle"></section>
+</div>
+
+<script>
+"use strict";
+(() => {
+  // Весь учебный материал и графика встроены: интернет не требуется.
+  const STORAGE_KEY = "zoologist-platformer-v1";
+  const TOTAL_TIME = 15 * 60;
+  const WORLD_W = 3850;
+  const FLOOR = 365;
+  const $ = id => document.getElementById(id);
+  const canvas = $("world");
+  const ctx = canvas.getContext("2d");
+  const overlay = $("overlay");
+  const dialog = $("dialog");
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Вопросы опираются на таблицу из предоставленного учебника.
+  // Уточнения «обычно» и конкретные примеры исключают ложные обобщения.
+  const questions = [
+    {
+      icon:"🐺", title:"Лесной знакомый",
+      text:"Волк покрыт шерстью и выкармливает детёнышей молоком. К какому классу он относится?",
+      options:["Млекопитающие","Птицы","Пресмыкающиеся"], correct:0,
+      hint:"Подсказка: название этого класса связано с кормлением молоком.",
+      explanation:"Волк — млекопитающее. Его тело покрыто шерстью, а волчица кормит волчат молоком."
+    },
+    {
+      icon:"🦢", title:"Пернатый житель",
+      text:"У лебедя есть перья, два крыла и две ноги. Кто он?",
+      options:["Рыба","Птица","Насекомое"], correct:1,
+      hint:"Подсказка: перья — главный отличительный признак этого класса.",
+      explanation:"Лебедь — птица. Тело птиц покрыто перьями; у них два крыла и две ноги."
+    },
+    {
+      icon:"🐟", title:"Подводная станция",
+      text:"У карася есть плавники и жабры. К какому классу он относится?",
+      options:["Земноводные","Млекопитающие","Рыбы"], correct:2,
+      hint:"Подсказка: карась дышит в воде жабрами и передвигается с помощью плавников.",
+      explanation:"Карась — рыба. Его тело покрыто чешуёй, он дышит жабрами и плавает с помощью плавников."
+    },
+    {
+      icon:"🐜", title:"Сосчитай ноги",
+      text:"У муравья есть голова, грудь, брюшко и шесть ног. Кто он?",
+      options:["Насекомое","Пресмыкающееся","Земноводное"], correct:0,
+      hint:"Подсказка: у представителей этого класса три пары ног.",
+      explanation:"Муравей — насекомое. У насекомых шесть ног, а тело состоит из головы, груди и брюшка."
+    },
+    {
+      icon:"🐢", title:"Панцирь и чешуйки",
+      text:"Черепаха откладывает яйца. Её кожа покрыта роговыми чешуйками, а панцирь — щитками. К какому классу она относится?",
+      options:["Птицы","Пресмыкающиеся","Млекопитающие"], correct:1,
+      hint:"Подсказка: в этот же класс входят ящерицы и змеи.",
+      explanation:"Черепаха — пресмыкающееся. У пресмыкающихся сухая кожа с роговыми чешуйками или щитками. У змей ног нет."
+    },
+    {
+      icon:"🐸", title:"У лесного пруда",
+      text:"У взрослой лягушки голая влажная кожа и четыре ноги. К какому классу она относится?",
+      options:["Рыбы","Насекомые","Земноводные"], correct:2,
+      hint:"Подсказка: жизнь этих животных связана и с водой, и с сушей.",
+      explanation:"Лягушка — земноводное. Её голая влажная кожа отличается от чешуи рыб и пресмыкающихся."
+    },
+    {
+      icon:"🐺", title:"Как появляются волчата?",
+      text:"Выбери правильный рассказ о размножении волков.",
+      options:["Волчица откладывает икру в воду.","Волчица рождает живых детёнышей и кормит их молоком.","Волчата вылупляются из яиц в гнезде."], correct:1,
+      hint:"Подсказка: вспомни, почему волков относят к млекопитающим.",
+      explanation:"Волчица рождает живых волчат и выкармливает их молоком. Так размножается большинство млекопитающих."
+    },
+    {
+      icon:"🐣", title:"Птенцы в гнезде",
+      text:"Как у лебедей появляются птенцы?",
+      options:["Лебеди откладывают и высиживают яйца; из них вылупляются птенцы.","Птенцы развиваются из икры в воде.","Лебеди рождают птенцов и кормят их молоком."], correct:0,
+      hint:"Подсказка: птенец сначала развивается внутри яйца.",
+      explanation:"Лебеди откладывают яйца и высиживают их. Из яиц вылупляются птенцы."
+    },
+    {
+      icon:"🐟", title:"Икринки в воде",
+      text:"Как размножается карась?",
+      options:["Откладывает яйца с твёрдой скорлупой на берегу.","Рождает детёнышей и кормит их молоком.","Мечет икру в воде; из икринок развиваются мальки."], correct:2,
+      hint:"Подсказка: маленькие яйца рыб называют икрой, а молодых рыб — мальками.",
+      explanation:"Карась мечет икру. Из оплодотворённых икринок развиваются мальки — маленькие рыбки."
+    },
+    {
+      icon:"🐸", title:"Последнее открытие",
+      text:"Какой рассказ о развитии лягушки правильный?",
+      options:["Яйцо на суше → птенец → лягушка.","Икра в воде → головастик → взрослая лягушка.","Живой детёныш → кормление молоком → лягушка."], correct:1,
+      hint:"Подсказка: сначала у будущей лягушки есть хвост, а ноги появляются позднее.",
+      explanation:"Лягушка откладывает икру в воду. Из икринок появляются головастики, которые постепенно превращаются в лягушек."
+    }
+  ];
+  const reference = [
+    ["🐺 Млекопитающие","Обычно покрыты шерстью. Большинство рождает живых детёнышей. Матери кормят детёнышей молоком. Примеры: волк, верблюд."],
+    ["🦢 Птицы","Тело покрыто перьями. Две ноги и два крыла. Откладывают яйца и обычно высиживают их. Примеры: лебедь, синица."],
+    ["🐟 Рыбы","Дышат жабрами, имеют плавники. У многих тело покрыто чешуёй. Большинство мечет икру. Пример: карась."],
+    ["🐜 Насекомые","Голова, грудь, брюшко; шесть ног. Обычно откладывают яйца. Примеры: муравей, бабочка."],
+    ["🐢 Пресмыкающиеся","Сухая кожа с роговыми чешуйками или щитками. Обычно четыре ноги, у змей ног нет. Большинство откладывает яйца. Примеры: черепаха, ящерица."],
+    ["🐸 Земноводные","Голая влажная кожа. У взрослой лягушки четыре ноги. Лягушки откладывают икру в воду; из неё появляются головастики."]
+  ];
+
+  const stations = questions.map((q,i) => ({
+    x:330+i*355, y:i%3===1?295:i%3===2?265:FLOOR
+  }));
+  const platforms = stations.filter(s=>s.y<FLOOR).map(s=>({x:s.x-100,y:s.y,w:200}));
+  const keys = {left:false,right:false};
+  let state, player, camera=0, mode="intro", last=0, saveClock=0;
+  let currentQuestion=-1, questionSolved=false, returnMode="playing";
+  let storageAvailable=true, toast="", toastUntil=0, focusBefore=null;
+
+  function freshState(){
+    return {version:1, completed:[], score:0, remaining:TOTAL_TIME, x:65, finished:false};
+  }
+  function readSave(){
+    try{
+      const s=JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if(!s || s.version!==1 || !Array.isArray(s.completed)) return null;
+      if(s.completed.some((v,i)=>v!==i) || s.completed.length>10) return null;
+      if(!Number.isFinite(s.remaining) || s.remaining<0 || s.remaining>TOTAL_TIME) return null;
+      if(!Number.isFinite(s.x)) return null;
+      s.score=s.completed.length*10;
+      return s;
+    }catch(e){return null;}
+  }
+  function save(){
+    if(!state) return;
+    state.x=player?player.x:state.x;
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
+    catch(e){storageAvailable=false;}
+  }
+  function resetPlayer(){
+    player={x:Math.max(20,Math.min(WORLD_W-35,state.x)),y:FLOOR-42,w:28,h:42,vx:0,vy:0,grounded:true};
+    // Возобновление на ближайшей поверхности без застревания внутри платформы.
+    for(const p of platforms){
+      if(player.x+player.w>p.x && player.x<p.x+p.w) player.y=p.y-player.h;
+    }
+  }
+  function updateHUD(){
+    const sec=Math.ceil(state.remaining);
+    $("timer").textContent=`⏱ ${String(Math.floor(sec/60)).padStart(2,"0")}:${String(sec%60).padStart(2,"0")}`;
+    $("timer").classList.toggle("warning",sec<=60);
+    $("score").textContent=`⭐ ${state.score}`;
+    $("count").textContent=`Задания: ${state.completed.length} / 10`;
+    $("bar").style.width=state.completed.length*10+"%";
+    document.querySelector(".progress").setAttribute("aria-valuenow",state.completed.length);
+  }
+  function show(html){
+    keys.left=keys.right=false;
+    focusBefore=document.activeElement;
+    dialog.innerHTML=html;
+    overlay.hidden=false;
+    requestAnimationFrame(()=>dialog.querySelector("button")?.focus());
+  }
+  function hide(){
+    overlay.hidden=true;
+    if(focusBefore?.isConnected) focusBefore.focus();
+  }
+  function intro(){
+    mode="intro";
+    const previous=readSave();
+    show(`<span class="badge">Научная экспедиция · 7–10 лет</span>
+      <h2 id="dialogTitle">Добро пожаловать на тропинку зоолога!</h2>
+      <p>Пройди лесную тропинку, прыгай на платформы и открой <b>10 станций</b>. На каждой тебя ждёт вопрос о животных.</p>
+      <p>За выполненное задание ты получишь <b>10 очков</b>. Ошибся? Прочитай подсказку и попробуй ещё раз — очки не снимаются.</p>
+      <p>У тебя <b>15 минут</b>. Памятка и пауза останавливают время. Дойти до всех станций помогут стрелки и кнопка прыжка.</p>
+      <div class="actions">${previous&&!previous.finished&&previous.remaining>0?'<button class="primary" id="continue">Продолжить экспедицию</button>':""}
+      <button class="${previous&&!previous.finished&&previous.remaining>0?"small":"primary"}" id="start">Новая игра</button></div>`);
+    $("start").onclick=()=>start(false);
+    if($("continue")) $("continue").onclick=()=>start(true);
+  }
+  function start(resume){
+    state=resume?readSave():freshState();
+    if(!state) state=freshState();
+    resetPlayer(); mode="playing"; hide(); updateHUD(); save();
+  }
+  function jump(){
+    if(mode==="playing"&&player.grounded){
+      player.vy=-650;player.grounded=false;
+    }
+  }
+  function openQuestion(index){
+    mode="question";currentQuestion=index;questionSolved=false;
+    const q=questions[index];
+    show(`<span class="badge">Станция ${index+1} из 10 · +10 очков</span>
+      <div class="animal" aria-hidden="true">${q.icon}</div>
+      <h2 id="dialogTitle">${q.title}</h2><p>${q.text}</p>
+      <div class="answers">${q.options.map((o,i)=>`<button class="answer" data-answer="${i}">${o}</button>`).join("")}</div>
+      <div class="feedback" role="status" id="feedback">Выбери ответ. Можно пробовать сколько угодно!</div>
+      <div class="actions"><button class="primary" id="next" hidden>Продолжить путь →</button></div>`);
+    dialog.querySelectorAll("[data-answer]").forEach(b=>b.onclick=()=>answer(Number(b.dataset.answer),b));
+    $("next").onclick=()=>{
+      hide();
+      if(state.completed.length===10) finish(true);
+      else{
+        mode="playing";
+        toast="Отлично! Следующая станция — справа →";
+        toastUntil=performance.now()+3500;
+      }
+    };
+  }
+  function answer(choice,button){
+    if(questionSolved||mode!=="question") return;
+    const q=questions[currentQuestion];
+    if(choice!==q.correct){
+      button.classList.add("wrong");
+      $("feedback").textContent="Попробуй ещё! "+q.hint;
+      return;
+    }
+    questionSolved=true;
+    button.classList.add("correct");
+    dialog.querySelectorAll("[data-answer]").forEach(b=>b.disabled=true);
+    state.completed.push(currentQuestion);
+    state.score=state.completed.length*10;
+    $("feedback").textContent="Верно! "+q.explanation;
+    $("next").hidden=false;
+    $("next").textContent=state.completed.length===10?"Посмотреть результаты 🏆":"Продолжить путь →";
+    updateHUD();save();$("next").focus();
+  }
+  function pause(){
+    if(mode!=="playing"&&mode!=="question") return;
+    if(mode==="question") {
+      returnMode="question";
+      // Сохраняем узлы, чтобы ответы и обратная связь пережили паузу.
+      pausedNodes=Array.from(dialog.childNodes);
+    }else returnMode="playing";
+    mode="paused";save();
+    show(`<span class="badge">Время остановлено</span><h2 id="dialogTitle">Небольшой привал 🌳</h2>
+      <p>Твой прогресс сохранён${storageAvailable?" в этом браузере":": пока только в открытой вкладке"}.</p>
+      <div class="actions"><button class="primary" id="resume">Продолжить</button><button class="small" id="restart">Начать заново</button></div>`);
+    $("resume").onclick=resume;
+    $("restart").onclick=confirmRestart;
+  }
+  let pausedNodes=null;
+  function resume(){
+    if(returnMode==="question"&&pausedNodes){
+      dialog.replaceChildren(...pausedNodes);pausedNodes=null;mode="question";
+      dialog.querySelector("button:not(:disabled):not([hidden])")?.focus();
+    }else{mode="playing";hide();}
+  }
+  function confirmRestart(){
+    show(`<h2 id="dialogTitle">Начать новую экспедицию?</h2><p>Счёт, таймер и все станции будут сброшены.</p>
+      <div class="actions"><button class="primary" id="yes">Да, начать заново</button><button class="small" id="no">Вернуться</button></div>`);
+    $("yes").onclick=()=>{pausedNodes=null;start(false);};
+    $("no").onclick=()=>{mode=returnMode==="question"?"question":"playing";if(pausedNodes){dialog.replaceChildren(...pausedNodes);pausedNodes=null;}else hide();pause();};
+  }
+  function help(){
+    const previousMode=mode;
+    if(mode==="help"||mode==="result"||mode==="paused") return;
+    const oldNodes=Array.from(dialog.childNodes);
+    mode="help";save();
+    show(`<span class="badge">Памятка зоолога · время остановлено</span>
+      <h2 id="dialogTitle">Шесть классов животных</h2>
+      <div class="reference">${reference.map(([name,text])=>`<article><strong>${name}</strong><p>${text}</p></article>`).join("")}</div>
+      <p class="note">Зоология — наука о животных. В таблице учебника показаны типичные признаки. В природе бывают исключения: например, кит — млекопитающее, хотя у него нет четырёх лап.</p>
+      <button class="primary" id="closeHelp">Вернуться</button>`);
+    $("closeHelp").onclick=()=>{
+      mode=previousMode;
+      if(previousMode==="question"||previousMode==="intro"){
+        dialog.replaceChildren(...oldNodes);
+        dialog.querySelector("button:not(:disabled):not([hidden])")?.focus();
+      }else hide();
+    };
+  }
+  function finish(success){
+    mode="result";state.finished=true;save();updateHUD();
+    show(`<div class="result">${success?"🏆🌟🌿":"🌿⏰"}</div>
+      <h2 id="dialogTitle">${success?"Экспедиция завершена!":"Время экспедиции закончилось"}</h2>
+      <p>${success?"Ты различаешь представителей шести классов животных и знаешь, как появляются волчата, птенцы, мальки и головастики!":"Ты уже сделал важные открытия! Начни новую экспедицию, чтобы закрепить знания и пройти всю тропинку."}</p>
+      <p><b>Станций: ${state.completed.length} из 10 · Очков: ${state.score} из 100</b></p>
+      <p>Запомни: шерсть и молоко — млекопитающие; перья — птицы; жабры и плавники — рыбы; шесть ног — насекомые; роговые чешуйки — пресмыкающиеся; голая влажная кожа у лягушки — земноводные.</p>
+      <button class="primary" id="again">Играть снова</button>`);
+    $("again").onclick=()=>start(false);
+  }
+
+  // Физика: фиксированные координаты мира и шаг времени,
+  // ограниченный после возвращения к вкладке.
+  function physics(dt){
+    player.vx=(Number(keys.right)-Number(keys.left))*230;
+    player.x=Math.max(10,Math.min(WORLD_W-player.w-10,player.x+player.vx*dt));
+    const oldBottom=player.y+player.h;
+    player.vy+=1650*dt;
+    player.y+=player.vy*dt;
+    player.grounded=false;
+    const surfaces=[{x:0,y:FLOOR,w:WORLD_W},...platforms];
+    for(const p of surfaces){
+      if(player.vy>=0 && oldBottom<=p.y+1 && player.y+player.h>=p.y &&
+        player.x+player.w>p.x && player.x<p.x+p.w){
+        player.y=p.y-player.h;player.vy=0;player.grounded=true;
+      }
+    }
+    const next=state.completed.length;
+    if(next<10){
+      const s=stations[next];
+      if(Math.abs(player.x+player.w/2-s.x)<43 &&
+        Math.abs(player.y+player.h-s.y)<25) openQuestion(next);
+    }
+  }
+
+  function rounded(x,y,w,h,r,color){
+    ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();
+  }
+  function draw(now){
+    const dpr=Math.min(devicePixelRatio||1,2);
+    const width=canvas.clientWidth,height=canvas.clientHeight;
+    if(canvas.width!==Math.round(width*dpr)||canvas.height!==Math.round(height*dpr)){
+      canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const scale=height/440,viewW=width/scale;
+    ctx.scale(scale,scale);
+    const target=player?Math.max(0,Math.min(WORLD_W-viewW,player.x-viewW*.32)):0;
+    camera=target;
+    const sky=ctx.createLinearGradient(0,0,0,440);
+    sky.addColorStop(0,"#c4e8e1");sky.addColorStop(1,"#f1f5d6");
+    ctx.fillStyle=sky;ctx.fillRect(0,0,viewW,440);
+    ctx.fillStyle="#ffe9a0";ctx.beginPath();ctx.arc(viewW-75,70,34,0,Math.PI*2);ctx.fill();
+    // Дальние холмы двигаются медленнее переднего плана.
+    for(let i=-1;i<Math.ceil(viewW/230)+2;i++){
+      const x=i*230-(camera*.18%230);
+      ctx.fillStyle="#b1d6b6";ctx.beginPath();ctx.ellipse(x,365,210,155,0,0,Math.PI*2);ctx.fill();
+    }
+    ctx.save();ctx.translate(-camera,0);
+    for(let i=0;i<19;i++){
+      const x=i*225+95;
+      rounded(x-7,235,14,130,5,"#947553");
+      ctx.fillStyle=i%2?"#72ab82":"#83b98a";
+      ctx.beginPath();ctx.arc(x,225,53,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(x-24,249,37,0,Math.PI*2);ctx.fill();
+    }
+    rounded(0,FLOOR,WORLD_W,75,0,"#b09161");
+    rounded(0,FLOOR,WORLD_W,13,0,"#5b975a");
+    for(const p of platforms){
+      rounded(p.x,p.y,p.w,19,8,"#96704f");
+      rounded(p.x,p.y,p.w,8,4,"#65a663");
+    }
+    for(let i=0;i<stations.length;i++){
+      const s=stations[i],done=state?.completed.includes(i),active=i===(state?.completed.length||0);
+      const pulse=active&&!reducedMotion?Math.sin(now/220)*3:0;
+      if(active){ctx.fillStyle="#fff5b699";ctx.beginPath();ctx.arc(s.x,s.y-42,36+pulse,0,Math.PI*2);ctx.fill();}
+      rounded(s.x-3,s.y-53,6,53,3,"#806b48");
+      rounded(s.x-23,s.y-73,46,40,11,done?"#276c45":active?"#ffdb74":"#e3ebdb");
+      ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="bold 21px system-ui";
+      ctx.fillStyle=done?"white":"#34573b";ctx.fillText(done?"✓":String(i+1),s.x,s.y-53);
+      if(active){
+        ctx.font="bold 13px system-ui";ctx.fillStyle="#244e36";
+        ctx.fillText("ТВОЯ СТАНЦИЯ",s.x,s.y-98);
+      }
+    }
+    // Персонаж нарисован средствами Canvas, без внешних изображений.
+    if(player){
+      const p=player,bob=p.grounded&&p.vx&&!reducedMotion?Math.sin(now/70)*2:0;
+      rounded(p.x+4,p.y+19+bob,21,20,6,"#efad40");
+      rounded(p.x+5,p.y+36,7,7,2,"#294e51");
+      rounded(p.x+18,p.y+36,7,7,2,"#294e51");
+      ctx.fillStyle="#f1c496";ctx.beginPath();ctx.arc(p.x+14,p.y+12+bob,11,0,Math.PI*2);ctx.fill();
+      rounded(p.x+1,p.y+bob,27,7,3,"#497552");
+      rounded(p.x+6,p.y-7+bob,17,11,4,"#648c56");
+      ctx.fillStyle="#26433a";ctx.fillRect(p.x+18,p.y+10+bob,3,3);
+      rounded(p.x-2,p.y+22+bob,7,14,3,"#487e6c");
+    }
+    ctx.restore();
+    if(mode==="playing"&&now<toastUntil){
+      const tw=Math.min(viewW-20,430);
+      rounded((viewW-tw)/2,15,tw,40,12,"#fffef2ee");
+      ctx.fillStyle="#285f3b";ctx.textAlign="center";ctx.font="bold 14px system-ui";
+      ctx.fillText(toast,viewW/2,36);
+    }
+  }
+  function loop(now){
+    const dt=last?Math.min((now-last)/1000,.04):0;last=now;
+    if(state&&(mode==="playing"||mode==="question")){
+      state.remaining=Math.max(0,state.remaining-dt);
+      if(state.remaining<=0) finish(state.completed.length===10);
+      else if(mode==="playing") physics(dt);
+      updateHUD();saveClock+=dt;
+      if(saveClock>1){save();saveClock=0;}
+    }
+    draw(now);requestAnimationFrame(loop);
+  }
+
+  function release(){keys.left=keys.right=false;}
+  document.querySelectorAll("[data-key]").forEach(button=>{
+    button.addEventListener("pointerdown",e=>{
+      e.preventDefault();button.setPointerCapture(e.pointerId);
+      const k=button.dataset.key;if(k==="jump")jump();else if(mode==="playing")keys[k]=true;
+    });
+    for(const event of ["pointerup","pointercancel","lostpointercapture"]){
+      button.addEventListener(event,()=>{const k=button.dataset.key;if(k!=="jump")keys[k]=false;});
+    }
+  });
+  window.addEventListener("keydown",e=>{
+    const k=e.key.toLowerCase();
+    if(["arrowleft","arrowright","arrowup"," ","a","d","w"].includes(k)&&mode==="playing"){
+      e.preventDefault();
+      if(k==="arrowleft"||k==="a")keys.left=true;
+      if(k==="arrowright"||k==="d")keys.right=true;
+      if(!e.repeat&&["arrowup"," ","w"].includes(k))jump();
+    }
+    if(k==="escape"&&(mode==="playing"||mode==="question"))pause();
+    // Удерживаем клавиатурный фокус внутри открытого диалога.
+    if(e.key==="Tab"&&!overlay.hidden){
+      const buttons=[...dialog.querySelectorAll("button:not(:disabled):not([hidden])")];
+      const first=buttons[0],end=buttons[buttons.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();end?.focus();}
+      else if(!e.shiftKey&&document.activeElement===end){e.preventDefault();first?.focus();}
+    }
+  });
+  window.addEventListener("keyup",e=>{
+    const k=e.key.toLowerCase();
+    if(k==="arrowleft"||k==="a")keys.left=false;
+    if(k==="arrowright"||k==="d")keys.right=false;
+  });
+  window.addEventListener("blur",()=>{release();pause();});
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden){release();pause();save();}
+  });
+  window.addEventListener("pagehide",save);
+  $("pause").onclick=pause;
+  $("help").onclick=help;
+  state=freshState();resetPlayer();updateHUD();intro();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
